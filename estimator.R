@@ -1,4 +1,4 @@
-# Control function quantile regression with series expansion for residuals
+###### Control function quantile regression with series expansion for residuals
 cf_qr_estimate <- function(Y, D, Z, tau = 0.25, degree = 3, return_model = FALSE) {
   
   # Step 1: First stage - quantile regression of D on Z
@@ -18,15 +18,16 @@ cf_qr_estimate <- function(Y, D, Z, tau = 0.25, degree = 3, return_model = FALSE
   second_stage <- rq(as.formula(formula_str), data = cbind(Y = Y, design_df), tau = tau)
   
   if (return_model) {
-    return(list(
-      beta_D = second_stage$coefficients["D"],
-      second_stage = second_stage,
-      first_stage = first_stage,
-      e_hat = e_hat
-    ))
+    return( second_stage
+    )
   } else {
     return(second_stage$coefficients["D"])
   }
 }
+
+#### Numerical Integration 
+
+
+
 
 

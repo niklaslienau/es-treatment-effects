@@ -7,7 +7,6 @@ evaluate_qte_estimators <- function(
     n = 1000,
     beta_true = 1,
     degree = 3,
-    scale = TRUE,
     seed = 123
 ) {
   set.seed(seed)
@@ -24,12 +23,8 @@ evaluate_qte_estimators <- function(
     cf_estimates <- numeric(R)
     
     for (r in 1:R) {
-      # Choose the DGP based on scale flag
-      df <- if (scale) {
-        simulate_loc_scale(n = n, seed = r)
-      } else {
-        simulate_loc_shift(n = n, seed = r)
-      }
+      # Location shift DGP
+      df <- simulate_loc_shift(n = n, seed = r)
       
       # Naive QR
       naive_fit <- try(rq(Y ~ D, data = df, tau = tau), silent = TRUE)
@@ -40,7 +35,7 @@ evaluate_qte_estimators <- function(
       cf_estimates[r] <- if (inherits(cf_try, "try-error") || !is.numeric(cf_try) || length(cf_try) != 1 || is.na(cf_try)) NA else cf_try
     }
     
-    # Store metrics
+    # Store performance metrics
     mse_results$naive_mse[i]  <- mean((naive_estimates - beta_true)^2, na.rm = TRUE)
     mse_results$naive_bias[i] <- mean(naive_estimates - beta_true, na.rm = TRUE)
     mse_results$naive_var[i]  <- var(naive_estimates, na.rm = TRUE)
@@ -53,12 +48,10 @@ evaluate_qte_estimators <- function(
   return(mse_results)
 }
 
-#Evaluate for Scale and Shift
-# For location-shift DGP
-evaluate_qte_estimators(scale = FALSE, quantiles = c(0.01,0.1,0.25,0.5), n=250, R=500)
+
 
 # For location-scale DGP
-evaluate_qte_estimators(scale = TRUE, quantiles = c(0.01,0.1,0.25,0.5), n=250, R=500)
+evaluate_qte_estimators(quantiles = c(0.01,0.1,0.25,0.5), n=250, R=500)
 
 
 
