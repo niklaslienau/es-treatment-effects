@@ -17,7 +17,7 @@ simulate_loc_scale <- function(n = 1000, beta = 1, pi = 1, gamma = 0.5, rho = 0.
   D <- pi * Z + e # Endogenous treatment variable D
   # Outcome variable Y (location scale — with heteroskedasticity)
   Y <- beta * D + exp(gamma * D) * u
-  data.frame(Y = Y, D = D, Z = Z, u = u, e = e)
+  data.frame(Y = Y, D = D, Z = Z)
 }
 
 # Function to simulate from a location shift model (homoskedastic errors)
@@ -33,9 +33,8 @@ simulate_loc_shift <- function(n = 1000, beta = 1, pi = 1, rho = 0.7, seed = NUL
   # Outcome variable Y (location shift only — no heteroskedasticity)
   Y <- beta * D + u
   # Return data frame
-  data.frame(Y = Y, D = D, Z = Z, u = u, e = e)
+  data.frame(Y = Y, D = D, Z = Z)
 }
-
 
 
 
