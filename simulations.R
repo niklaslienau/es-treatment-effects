@@ -51,7 +51,7 @@ evaluate_qte_estimators <- function(
 
 
 # Evaluate
-evaluate_qte_estimators(quantiles = c(0.001,0.01,0.025,0.1, 0.25,0.5), n=250, R=200)
+evaluate_qte_estimators(quantiles = c(0.001,0.01,0.025,0.1, 0.25,0.5), n=100, R=200, seed=123)
 
 
 
@@ -116,9 +116,9 @@ evaluate_qte_performance_by_sample_size <- function(
   return(list(results_table = results, plot = plot))
 }
 
-res <- evaluate_qte_performance_by_sample_size(quantiles = c(0.001,0.01,0.05,0.1),
-                                               sample_sizes = c(30, 50, 100, 150, 200, 300, 500, 1000),
-                                               R = 250, seed=42)
+res <- evaluate_qte_performance_by_sample_size(quantiles = c(0.01, 0.05,0.1,0.25,0.5),
+                                               sample_sizes = c(100, 200, 350, 500, 1000,10000),
+                                                                R = 1000, seed=123)
 res$plot
 
 
