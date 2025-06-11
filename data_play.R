@@ -4,8 +4,9 @@ source("/Users/niklaslienau/Dropbox/PhD/Research/ES_cont_treatment/dgp.R")
 ###Plot Counterfactual function vs Quantile Regression (Endogeniety)
 
 plot_quantile_shift <- function(tau = 0.25, beta = 1, n = 1000, rho = 0.7, pi = 1, seed = 123) {
+  set.seed(123)
   # Simulate data
-  df <- simulate_loc_shift(n = n, beta = beta, pi = pi, rho = rho, seed = seed)
+  df <- simulate_loc_shift(n = n, beta = beta, pi = pi, rho = rho)
   
   # Fit linear quantile regression
   qreg <- rq(Y ~ D, tau = tau, data = df)
