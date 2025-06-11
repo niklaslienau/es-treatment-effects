@@ -116,8 +116,8 @@ evaluate_qte_performance_by_sample_size <- function(
   return(list(results_table = results, plot = plot))
 }
 
-res <- evaluate_qte_performance_by_sample_size(quantiles = c(0.01, 0.05,0.1,0.25,0.5),
-                                               sample_sizes = c(100, 200, 350, 500, 1000,10000),
+res <- evaluate_qte_performance_by_sample_size(quantiles = c( 0.05,0.1,0.25,0.5),
+                                               sample_sizes = c(100, 200, 350, 500, 1000),
                                                                 R = 1000, seed=123)
 res$plot
 
