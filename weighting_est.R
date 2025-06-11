@@ -1,3 +1,5 @@
+library(ggplot2)
+library(tidyr)
 ### Grab variance estimate for QR coefficent (for now from regression, maybe later bootstrap ?)
 data= simulate_loc_shift()
 cf_qr_res=cf_qr_estimate(return_model = TRUE, tau=0.25, Y= data$Y, D= data$D, Z= data$Z)
@@ -102,8 +104,78 @@ evaluate_grid_averaged_estimator <- function(
   return(results)
 }
 
+#MC Eval
 
 mc_res = evaluate_grid_averaged_estimator(tau_max = 0.25, grid_points = 10, n=250, R=200)
+
+
+## Bias Variance Trade of in number of grid points
+grid_number_evaluation <- function(
+    tau_max = 0.25,
+    grid_points_vec = c(3, 5, 10, 25, 50, 100),
+    n = 250,
+    R = 200,
+    degree = 3,
+    beta_true = 1
+) {
+  library(ggplot2)
+  library(tidyr)
+  
+  results <- data.frame(
+    grid_points = grid_points_vec,
+    mse = NA,
+    abs_bias = NA,
+    variance = NA
+  )
+  
+  for (i in seq_along(grid_points_vec)) {
+    gp <- grid_points_vec[i]
+    cat("Running for grid_points =", gp, "...\n")
+    
+    res <- evaluate_grid_averaged_estimator(
+      tau_max = tau_max,
+      grid_points = gp,
+      n = n,
+      R = R,
+      beta_true = beta_true,
+      degree = degree
+    )
+    
+    results$mse[i] <- res$mse
+    results$abs_bias[i] <- abs(res$bias)
+    results$variance[i] <- res$variance
+  }
+  
+  # Reshape for plotting
+  results_long <- pivot_longer(results, cols = c("mse", "abs_bias", "variance"),
+                               names_to = "metric", values_to = "value")
+  
+  # Plot
+  plot <- ggplot(results_long, aes(x = grid_points, y = value, color = metric)) +
+    geom_line() +
+    geom_point() +
+    labs(
+      title = paste0("Bias Variance Trade off from MC Sim"),
+      x = "Number of Grid Points",
+      y = "Value",
+      color = "Metric"
+    ) +
+    theme_minimal()
+  
+  return(list(results_table = results, plot = plot))
+}
+
+#Example Use 
+#NOTE: Here is no Bias Variance Trade off because each individual grid estimator in unbiased for target paramter
+# Also: for extreme tails in small samples QR are known to be biased 
+res_plot_obj <- grid_number_evaluation(grid_points_vec = c(3,5,10,25,50,100))
+res_plot_obj$plot  # to display the ggplot
+res_plot_obj$results_table  # to inspect the raw numbers
+
+
+
+
+
 
 ### Then asymptotically efficient weighting (with variance estimates)
 #A = identity matrix -> sum squared entries 

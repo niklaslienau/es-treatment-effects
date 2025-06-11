@@ -24,7 +24,7 @@ evaluate_qte_estimators <- function(
     
     for (r in 1:R) {
       # Location shift DGP
-      df <- simulate_loc_shift(n = n, seed = r)
+      df <- simulate_loc_shift(n = n)
       
       # Naive QR
       naive_fit <- try(rq(Y ~ D, data = df, tau = tau), silent = TRUE)
@@ -50,10 +50,76 @@ evaluate_qte_estimators <- function(
 
 
 
-# For location-scale DGP
-evaluate_qte_estimators(quantiles = c(0.01,0.1,0.25,0.5), n=250, R=500)
+# Evaluate
+evaluate_qte_estimators(quantiles = c(0.001,0.01,0.025,0.1, 0.25,0.5), n=250, R=200)
 
 
+
+### QTE estimator performance by sample size
+evaluate_qte_performance_by_sample_size <- function(
+    quantiles = c(0.001, 0.01, 0.05, 0.1, 0.25, 0.5),
+    sample_sizes = c(30, 50, 100, 150, 200, 300, 500, 1000),
+    R = 100,
+    beta_true = 1,
+    degree = 3,
+    seed = 123
+) {
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  
+  results <- expand.grid(
+    n = sample_sizes,
+    tau = quantiles,
+    stringsAsFactors = FALSE
+  ) %>% 
+    mutate(cf_mse = NA, cf_abs_bias = NA, cf_var = NA)
+  
+  for (i in 1:nrow(results)) {
+    n <- results$n[i]
+    tau <- results$tau[i]
+    
+    cat("Running for n =", n, ", tau =", tau, "\n")
+    
+    res <- evaluate_qte_estimators(
+      quantiles = tau,
+      R = R,
+      n = n,
+      beta_true = beta_true,
+      degree = degree,
+      seed = seed
+    )
+    
+    results$cf_mse[i] <- res$cf_mse[1]
+    results$cf_abs_bias[i] <- abs(res$cf_bias[1])
+    results$cf_var[i] <- res$cf_var[1]
+  }
+  
+  # Convert to long format for plotting
+  results_long <- results %>%
+    pivot_longer(cols = c("cf_mse", "cf_abs_bias", "cf_var"),
+                 names_to = "metric", values_to = "value")
+  
+  # Plot
+  plot <- ggplot(results_long, aes(x = n, y = value, color = as.factor(tau))) +
+    geom_line() +
+    geom_point() +
+    facet_wrap(~metric, scales = "free_y") +
+    labs(
+      title = "Performance of CF QTE Estimator vs. Sample Size",
+      x = "Sample Size",
+      y = "Value",
+      color = "Quantile τ"
+    ) +
+    theme_minimal()
+  
+  return(list(results_table = results, plot = plot))
+}
+
+res <- evaluate_qte_performance_by_sample_size(quantiles = c(0.001,0.01,0.05,0.1),
+                                               sample_sizes = c(30, 50, 100, 150, 200, 300, 500, 1000),
+                                               R = 250, seed=42)
+res$plot
 
 
 
