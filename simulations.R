@@ -119,9 +119,6 @@ res <- evaluate_qte_performance_by_sample_size(quantiles = c( 0.01,0.05,0.1),
 res$plot
 
 
-res$results_table
-res$results_table$cf_var
-
 
 
 
