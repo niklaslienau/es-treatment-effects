@@ -25,9 +25,3 @@ cf_qr_estimate <- function(Y, D, Z, tau = 0.25, degree = 3, return_model = FALSE
   }
 }
 
-
-
-
-
-
-
