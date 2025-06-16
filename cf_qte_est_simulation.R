@@ -4,9 +4,8 @@
 
 #####1#####
 #MSE Var and Bias Table for multiple quantiles
-
-evaluate_qte_estimators <- function(
-    quantiles = c(0.01, 0.05, 0.25, 0.5),
+evaluate_cf_qte <- function(
+    tau = 0.25,
     R = 1000,
     n = 1000,
     beta_true = 1,
@@ -14,47 +13,31 @@ evaluate_qte_estimators <- function(
 ) {
   set.seed(seed)
   
-  mse_results <- data.frame(
-    tau = quantiles,
-    naive_mse = NA, naive_bias = NA, naive_var = NA,
-    cf_mse = NA, cf_bias = NA, cf_var = NA
-  )
+  cf_estimates <- numeric(R)
   
-  for (i in seq_along(quantiles)) {
-    tau <- quantiles[i]
-    naive_estimates <- numeric(R)
-    cf_estimates <- numeric(R)
+  for (r in 1:R) {
+    df <- simulate_loc_shift(n = n)
     
-    for (r in 1:R) {
-      # Location shift DGP
-      df <- simulate_loc_shift(n = n)
-      
-      # Naive QR
-      naive_fit <- try(rq(Y ~ D, data = df, tau = tau), silent = TRUE)
-      naive_estimates[r] <- if (inherits(naive_fit, "try-error")) NA else naive_fit$coefficients["D"]
-      
-      # CF QR
-      cf_try <- try(cf_qr_estimate(df$Y, df$D, df$Z, tau = tau), silent = TRUE)
-      cf_estimates[r] <- if (inherits(cf_try, "try-error") || !is.numeric(cf_try) || length(cf_try) != 1 || is.na(cf_try)) NA else cf_try
-    }
-    
-    # Store performance metrics
-    mse_results$naive_mse[i]  <- mean((naive_estimates - beta_true)^2, na.rm = TRUE)
-    mse_results$naive_bias[i] <- mean(naive_estimates - beta_true, na.rm = TRUE)
-    mse_results$naive_var[i]  <- var(naive_estimates, na.rm = TRUE)
-    
-    mse_results$cf_mse[i]  <- mean((cf_estimates - beta_true)^2, na.rm = TRUE)
-    mse_results$cf_bias[i] <- mean(cf_estimates - beta_true, na.rm = TRUE)
-    mse_results$cf_var[i]  <- var(cf_estimates, na.rm = TRUE)
+    cf_try <- try(cf_qr_estimate(df$Y, df$D, df$Z, tau = tau), silent = TRUE)
+    cf_estimates[r] <- if (inherits(cf_try, "try-error") || !is.numeric(cf_try) || length(cf_try) != 1 || is.na(cf_try)) NA else cf_try
   }
   
-  return(mse_results)
+  # Clean and compute MSE
+  valid_estimates <- cf_estimates[!is.na(cf_estimates)]
+  mse <- mean((valid_estimates - beta_true)^2)
+  
+  return(list(
+    estimates = valid_estimates,
+    mse = mse
+  ))
 }
 
 
 
-# Evaluate
-evaluate_qte_estimators(quantiles = c(0.01,0.05,0.1, 0.25,0.5), n=1000, R=1000, seed=123)
+
+res <- evaluate_cf_qte(tau = 0.25, R = 1000, n = 1000)
+res$mse     # Mean squared error
+hist(res$estimates)  # Vector of QTE estimates
 
 
 
