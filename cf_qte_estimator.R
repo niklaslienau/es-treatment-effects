@@ -26,8 +26,7 @@ cf_qr_estimate <- function(Y, D, Z, tau = 0.25, degree = 3, return_model = FALSE
 }
 
 
-
-### Bootstrap variance estimator
+##Bootstrap estimator for variance
 bootstrap_qte_variance_single <- function(Y, D, Z, tau = 0.5, B = 200) {
   n <- length(Y)
   qte_estimates <- numeric(B)
@@ -36,15 +35,16 @@ bootstrap_qte_variance_single <- function(Y, D, Z, tau = 0.5, B = 200) {
     idx <- sample(1:n, size = n, replace = TRUE)
     Yb <- Y[idx]; Db <- D[idx]; Zb <- Z[idx]
     
-    qte <- try(cf_qr_estimate(Yb, Db, Zb, tau = tau), silent = TRUE)
-    qte_estimates[b] <- if (!inherits(qte, "try-error") && is.numeric(qte)) qte else NA
+    model <- try(cf_qr_estimate(Yb, Db, Zb, tau = tau), silent = TRUE)
+    
+    if (!inherits(model, "try-error") && is.numeric(model) && !is.na(model)) {
+      qte_estimates[b] <- model
+    } else {
+      qte_estimates[b] <- NA
+    }
   }
   
-  var_bootstrap <- var(qte_estimates, na.rm = TRUE)
-  
-  return(list(
-    qte_estimates = qte_estimates,
-    variance = var_bootstrap
-  ))
+  return(var(qte_estimates, na.rm = TRUE))
 }
+
 
