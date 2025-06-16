@@ -1,6 +1,10 @@
 
 ### MONTE CARLO for QTE: Naive QR vs CF Method on MSE, Bias & Variance
 
+
+#####1#####
+#MSE Var and Bias Table for multiple quantiles
+
 evaluate_qte_estimators <- function(
     quantiles = c(0.01, 0.05, 0.25, 0.5),
     R = 1000,
@@ -53,6 +57,9 @@ evaluate_qte_estimators <- function(
 evaluate_qte_estimators(quantiles = c(0.01,0.05,0.1, 0.25,0.5), n=1000, R=1000, seed=123)
 
 
+
+#####1#####
+#Monte Carlo Performance as a function of SAMPLE SIZE plot
 
 ### QTE estimator performance by sample size
 evaluate_qte_performance_by_sample_size <- function(
