@@ -97,7 +97,7 @@ monte_carlo_weighted_es <- function(
 
 # Run it
 c_values <- c(1e-5,1e-4,1e-3,1e-2,1e-1,1e0,1e1,1e2,1e3,1e4 )
-mc_plots <- monte_carlo_weighted_es(c= c_values, R = 1000, n = 500, tau_max =0.25)
+mc_plots <- monte_carlo_weighted_es(c= c_values, R = 1000, n = 500, tau_max =0.5)
 
 
 # Plot
