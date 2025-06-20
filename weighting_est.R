@@ -50,8 +50,6 @@ uniform_es_est <- function(Y, D,Z,  tau_max, grid_points) {
 
 
 
-
-
 #efficient weighting estimator no bootstrap
 #->variance downward biased and covariance ignored
 estimate_weighted_es_cf <- function(Y, D, Z, tau_max = 0.25, grid_points = 10, c = 1e-2) {
