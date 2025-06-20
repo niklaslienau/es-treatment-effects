@@ -33,7 +33,7 @@ simulate_dgp <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7,
   if (scale) {
     if (linear) {
       # Linear location scale: sigma(D) = gamma * D
-      Y <- beta * D + gamma * D * u
+      Y <- beta * D + (gamma * D) * u
     } else {
       # Nonlinear scale case (e.g. sigma(D) = exp(gamma * D))
       Y <- beta * D + exp(gamma * D) * u
