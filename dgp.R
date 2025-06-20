@@ -6,38 +6,44 @@ library(ggplot2)
 library(quantreg)
 
 
-simulate_dgp <- function(n = 1000, beta = 1, pi = 1, gamma = 0.5, rho = 0.7, 
-                         scale = TRUE, cont = TRUE) {
-  # Instrument Z
+simulate_dgp <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7, 
+                         scale = TRUE, cont = TRUE, linear = FALSE) {
+  # Simulate instrument
   Z <- rnorm(n)
   
-  # Jointly normal errors (u, e) with correlation rho
+  # Simulate correlated errors (u, e)
   Sigma <- matrix(c(1, rho, rho, 1), nrow = 2)
   errors <- MASS::mvrnorm(n = n, mu = c(0, 0), Sigma = Sigma)
   u <- errors[, 1]
   e <- errors[, 2]
   
-  # Latent treatment variable (always continuous)
+  # Generate endogenous treatment
   D_latent <- pi * Z + e
   
-  # Convert to treatment D
-  if (cont) {
-    D <- D_latent
-  } else {
-    # Discretize D_latent into 16 bins labeled 0 to 15 (schooling style)
+  # Handle discrete vs continuous treatment
+  if (!cont) {
     thresholds <- quantile(D_latent, probs = seq(0, 1, length.out = 17))
     D <- cut(D_latent, breaks = thresholds, labels = 0:15, include.lowest = TRUE)
-    D <- as.numeric(as.character(D))  # Convert factor to numeric
+    D <- as.numeric(as.character(D))
+  } else {
+    D <- D_latent
   }
   
   # Outcome equation
   if (scale) {
-    Y <- beta * D + exp(gamma * D) * u
+    if (linear) {
+      # Linear location scale: sigma(D) = gamma * D
+      Y <- beta * D + gamma * D * u
+    } else {
+      # Nonlinear scale case (e.g. sigma(D) = exp(gamma * D))
+      Y <- beta * D + exp(gamma * D) * u
+    }
   } else {
+    # Location shift only (homoskedastic errors)
     Y <- beta * D + u
   }
   
-  return(data.frame(Y = Y, D = D, Z = Z))
+  return(data.frame(Y = Y, D = D, Z = Z, u = u, e = e))
 }
 
 
