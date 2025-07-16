@@ -1,5 +1,5 @@
 ###### Control function quantile regression with series expansion for residuals
-cf_qr_estimate <- function(Y, D, Z, tau = 0.25, degree = 3, return_model = FALSE) {
+cf_qr_estimate <- function(Y, D, Z, tau = 0.5, degree = 3, return_model = FALSE) {
   
   # Step 1: First stage - quantile regression of D on Z
   first_stage <- rq(D ~ Z, tau = tau)
@@ -23,28 +23,6 @@ cf_qr_estimate <- function(Y, D, Z, tau = 0.25, degree = 3, return_model = FALSE
   } else {
     return(second_stage$coefficients["D"])
   }
-}
-
-
-##Bootstrap estimator for variance
-bootstrap_qte_variance_single <- function(Y, D, Z, tau = 0.5, B = 200) {
-  n <- length(Y)
-  qte_estimates <- numeric(B)
-  
-  for (b in 1:B) {
-    idx <- sample(1:n, size = n, replace = TRUE)
-    Yb <- Y[idx]; Db <- D[idx]; Zb <- Z[idx]
-    
-    model <- try(cf_qr_estimate(Yb, Db, Zb, tau = tau), silent = TRUE)
-    
-    if (!inherits(model, "try-error") && is.numeric(model) && !is.na(model)) {
-      qte_estimates[b] <- model
-    } else {
-      qte_estimates[b] <- NA
-    }
-  }
-  
-  return(var(qte_estimates, na.rm = TRUE))
 }
 
 
