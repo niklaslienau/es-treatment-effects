@@ -4,10 +4,17 @@
 library(MASS)
 library(ggplot2)
 library(quantreg)
+library(quadprog)
+library(esreg)
 
 
-simulate_dgp <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7, 
-                         scale = TRUE, cont = TRUE, linear = FALSE) {
+# gamma = heteroskedasticity coefficient
+# pi = Reduced form coefficent
+# rho = Error correlation that induces endogeneity
+#cont = D is continous (default) as opposed to multivalued discrete
+#error_var = variance of second normal error 
+
+simulate_dgp <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7, cont = TRUE,  error_var= 1) {
   # Simulate instrument
   Z <- rnorm(n)
   
@@ -29,22 +36,38 @@ simulate_dgp <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7,
     D <- D_latent
   }
   
-  # Outcome equation
-  if (scale) {
-    if (linear) {
-      # Linear location scale: sigma(D) = gamma * D
-      Y <- beta * D + (gamma * D) * u
-    } else {
-      # Nonlinear scale case (e.g. sigma(D) = exp(gamma * D))
-      Y <- beta * D + exp(gamma * D) * u
-    }
-  } else {
-    # Location shift only (homoskedastic errors)
-    Y <- beta * D + u
-  }
+  # Additional independent noise
+  epsilon <- rnorm(n, mean = 0, sd = error_var)
   
-  return(data.frame(Y = Y, D = D, Z = Z, u = u, e = e))
+  #structural error
+  v =  (gamma * abs(D)) * u + epsilon
+  
+  # Linear location scale: sigma(D) = gamma * D
+  Y <- beta * D + v
+  
+    
+  return(data.frame(Y = Y, D = D, Z = Z, u = u, e = e, v=v, epsilon=epsilon ))
 }
 
 
+##### EASY Option #####
 
+sim_dgp_homo = function(n= 1000, beta =1 , pi=1, rho=0.5){
+  
+  # Simulate correlated errors (u, e)
+  Sigma <- matrix(c(1, rho, rho, 1), nrow = 2)
+  errors <- MASS::mvrnorm(n = n, mu = c(0, 0), Sigma = Sigma)
+  u <- errors[, 1]
+  e <- errors[, 2]
+  
+  #Simulate Z from a runiform dist U(0,2)
+  Z= runif(n, 0,2)
+  
+  #Generate D
+  D = pi*Z + e
+  #Generate Y
+  Y= beta*D + u
+  
+  return(data.frame(Y = Y, D = D, Z = Z, u = u, e = e ))
+  
+}
