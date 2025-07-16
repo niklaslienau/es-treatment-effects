@@ -1,4 +1,62 @@
+
 ## Monte Carlo Simulations for weighted estimator
+
+### MC Performance comparison CTATE vs Status Quo ES estimators
+
+plot_mc_distribution_es_estimators <- function(tau = 0.5, R = 100, n = 1000, seed = 123, beta_true=1) {
+  set.seed(seed)
+  
+  naive_joint_estimates <- numeric(R)   
+  naive_twostep_estimates <- numeric(R)   
+  lienau_estimates <- numeric(R)      
+  for (r in 1:R) {   
+    cat("Iteration", r, "of", R)
+    df <- sim_dgp_homo(n = n)          
+   
+     # Joint ES     
+    naive_joint_fit <- esreg(df$Y ~  df$D, alpha=0.25)     
+    naive_joint_estimates[r] <- naive_joint_fit$coefficients[4]          
+    
+    # Two Step ES    
+    naive_twostep_estimates[r] <- two_step_es_est(df$Y, df$D,0.25)     
+    
+    # Lienau Estimator     
+    lienau_fit = efficient_es_est(df$Y, df$D, df$Z, tau = tau)    
+    lienau_estimates[r] <- lienau_fit$estimate   }      
+  
+    # True QTE   
+    es_true <- beta_true      
+    # Combine estimates  
+    df_plot <- data.frame(
+      estimate = c(naive_joint_estimates, naive_twostep_estimates,lienau_estimates),     
+      method = factor(rep(c("Naive Joint ES","Naive Two Step ES" , "Lienau ES"), each = R))   )     
+    df_plot <- df_plot[!is.na(df_plot$estimate), ]    
+    
+    # Plot   
+    ggplot(df_plot, aes(x = estimate, fill = method)) +
+      geom_density(alpha = 0.5) +
+      geom_vline(aes(xintercept = es_true, linetype = "True CTATE"), color = "black", linewidth = 1) +
+      scale_linetype_manual(name = "", values = c("True CTATE" = "dashed")) +
+      labs(
+        title = paste0("MC Distribution of CTATE Estimators (τ = ", tau, ")"),
+        x = "Estimate", y = "Density", fill = "Estimator"
+      ) +
+      theme_minimal()    
+    }
+
+
+quartz()
+plot_mc_distribution_es_estimators(tau = 0.25, R = 200, n=500, seed=123)
+
+
+
+
+
+
+
+
+
+
 
 ############################################### (1) EFFICIENT WEIGHTING ################################
 
@@ -93,10 +151,8 @@ monte_carlo_weighted_es <- function(
   ))
 }
 
-
-
 # Run it
-c_values <- c(1e-5,1e-4,1e-3,1e-2,1e-1,1e0,1e1,1e2,1e3,1e4 )
+c_values <- c(1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,1e0,1e1,1e2,1e3,1e4 )
 mc_plots <- monte_carlo_weighted_es(c= c_values, R = 1000, n = 500, tau_max =0.5)
 
 
@@ -121,118 +177,6 @@ ggplot(mc_plots$summary, aes(x = log10(c))) +
 
 
 
-######################### Bootstrap diagnostics ###########
-
-
-# Generate 50 bootstrap variance curves from 50 different random samples
-# Analyze variance in bootstrap estimates and how estimates behave across taus
-#library(ggplot2)
-#library(gridExtra)
-
-#plot_bootstrap_variance_curves <- function(n = 500, B = 200, grid_points = 10, tau_max = 0.25, reps = 50) {
-  # Helper to run one replication for a given sample size
-  run_for_n <- function(n_single) {
-    all_variances <- list()
-    tau_grid <- NULL
-    
-    for (i in 1:reps) {
-      df <- simulate_dgp(n = n_single, scale = FALSE)
-      
-      boot <- bootstrap_qte_variances(df$Y, df$D, df$Z,
-                                      tau_max = tau_max,
-                                      grid_points = grid_points,
-                                      B = B)
-      
-      if (is.null(tau_grid)) tau_grid <- boot$tau_grid
-      
-      curve_df <- data.frame(
-        tau = boot$tau_grid,
-        variance = diag(boot$cov_matrix),
-        sim = paste0("sim_", i)
-      )
-      
-      all_variances[[i]] <- curve_df
-    }
-    
-    df_all <- do.call(rbind, all_variances)
-    
-    ggplot(df_all, aes(x = tau, y = variance, group = sim)) +
-      geom_line(alpha = 0.5, color = "steelblue") +
-      labs(title = paste0("Bootstrap Variance Estimates (n = ", n_single, ")"),
-           x = "Quantile Level (tau)", y = "Bootstrap Variance") +
-      theme_minimal()
-  }
-  
-  if (length(n) == 1) {
-    # Single sample size
-    return(run_for_n(n))
-  } else {
-    # Multiple sample sizes → plot grid
-    plot_list <- lapply(n, run_for_n)
-    
-    quartz()  # macOS only; skip or change on other OS
-    grid.arrange(grobs = plot_list, ncol = 2)
-  }
-}
-#plot_bootstrap_variance_curves(n=c(250,500,1000,2000), reps=30) #Run
-
-
-
-
-###Compare bootstrap against MC estimates
-## See how well bootstraping performs on average to estimate the variance
-compare_variance_bootstrap_mc_by_tau <- function(tau_vec = seq(0.01,0.5, length.out=20), 
-                                                 n = 500, R = 1000, B = 200) {
-  results <- data.frame(
-    tau = numeric(),
-    bootstrap_var = numeric(),
-    mc_var = numeric()
-  )
-  
-  for (tau in tau_vec) {
-    # Store QTEs from each MC iteration
-    qte_estimates <- numeric(R)
-    bootstrap_vars <- numeric(R)
-    
-    for (r in 1:R) {
-      df <- simulate_dgp(n = n, scale = FALSE)
-      
-      # QTE estimation
-      qte <- try(cf_qr_estimate(df$Y, df$D, df$Z, tau = tau), silent = TRUE)
-      qte_estimates[r] <- if (!inherits(qte, "try-error") && is.numeric(qte)) qte else NA
-      
-      # Bootstrap variance estimation
-      vboot <- try(bootstrap_qte_variance_single(df$Y, df$D, df$Z, tau = tau, B = B), silent = TRUE)
-      bootstrap_vars[r] <- if (!inherits(vboot, "try-error") && is.numeric(vboot)) vboot else NA
-    }
-    
-    # Final summary for this tau
-    results <- rbind(results, data.frame(
-      tau = tau,
-      bootstrap_var = mean(bootstrap_vars, na.rm = TRUE),
-      mc_var = var(na.omit(qte_estimates))
-    ))
-  }
-  
-  return(results)
-}
-
-#Example Use
-res_1 <- compare_variance_bootstrap_mc_by_tau(tau_vec =seq(0.05, 0.5, length.out = 10), n = 500, R = 1000, B = 200)
-
-ggplot(res_1, aes(x = tau)) +
-  geom_line(aes(y = mc_var, color = "Monte Carlo")) +
-  geom_line(aes(y = bootstrap_var, color = "Avg Nonparametric Bootstrap")) +
-  labs(
-    x = "Quantile Level (τ)",
-    y = "Variance Estimate",
-    title = "Variance for CF-QTE estimator across τ",
-    color = "Estimator"
-  ) +
-  theme_minimal()
-
-
-
 
 
 
@@ -246,9 +190,9 @@ library(ggplot2)
 
 weights_vs_regul_plot <- function(R = 100,
                                         n = 500,
-                                        tau_max = 0.25,
+                                        tau_max = 0.5,
                                         grid_points_vec = c(5, 10, 15, 20),
-                                        c_values = c(1e-6, 1e-3, 1e0, 1e3),
+                                        c_values = c(1e-5,1e-4,1e-3,1e-2,1e-1,1e0,1e1,1e2),
                                         B = 200) {
   start_time <- Sys.time()
   results_list <- list()
@@ -319,7 +263,6 @@ weights_vs_regul_plot <- function(R = 100,
 }
 
 
-
 #use
 quartz()
 res_2 <- weights_vs_regul_plot(R = 1000, n = 500, grid_points_vec = c(3, 5, 10, 15))
@@ -338,7 +281,7 @@ evaluate_grid_fineness <- function(
     grid_points_vec = c(3, 5,7,9, 10),
     R = 1000,
     n = 500,
-    tau_max = 0.25,
+    tau_max = 0.5,
     B = 200,
     beta_true = 1,
     c_val = 1e-2
@@ -429,17 +372,10 @@ ggplot(res_3$summary, aes(x = grid_fineness)) +
 
 
 
-############### SAVE SIMULATION RESULTS  ############### 
-save(mc_plots, res_1,res_2,res_3, file = "sim_res.RData")
 
 
 
 
-gi
-
-
-
-############### STOP SIMULATING HERE !!!!!!!!!!!!!!!!!  ###############
 
 
 ######
@@ -549,138 +485,4 @@ grid.arrange(grobs = plot_list, nrow = 2, ncol = 4)
 
 
 
-
-
-####################################### (1) Uniform WEIGHTING ################################ 
-
-
-#### 1#####
-#UNIFORM MSE Output Table
-
-evaluate_grid_averaged_estimator <- function(
-    tau_max = 0.5,
-    grid_points = 10,
-    R = 1000,
-    n = 500,
-    beta_true = 1,
-    seed = 123
-) {
-  set.seed(seed)
-  
-  grid_estimates <- numeric(R)
-  
-  for (r in 1:R) {
-    # Draw sample from DGP
-    df <- simulate_loc_shift(n = n)
-    
-    # Compute grid-averaged estimate
-    grid_try <- try(uniform_es_est(df$Y, df$D, df$Z, 
-                                   tau_max = tau_max, 
-                                   grid_points = grid_points
-    ), 
-    silent = TRUE)
-    
-    grid_estimates[r] <- if (inherits(grid_try, "try-error")) {
-      NA
-    } else if (!is.list(grid_try) || is.null(grid_try$estimate)) {
-      NA  
-    } else if (!is.numeric(grid_try$estimate) || length(grid_try$estimate) != 1 || is.na(grid_try$estimate)) {
-      NA
-    } else {
-      grid_try$estimate
-    }
-  }
-  
-  # Remove NAs for performance calculation
-  valid_estimates <- grid_estimates[!is.na(grid_estimates)]
-  
-  # Calculate performance metrics
-  mse <- mean((valid_estimates - beta_true)^2)
-  bias <- mean(valid_estimates - beta_true)
-  variance <- var(valid_estimates)
-  
-  # Return results
-  results <- list(
-    estimates = grid_estimates,
-    valid_estimates = valid_estimates,
-    n_valid = length(valid_estimates),
-    mse = mse,
-    bias = bias,
-    variance = variance,
-    tau_max = tau_max,
-    grid_points = grid_points,
-    R = R
-  )
-  
-  return(results)
-}
-
-#MC Eval
-
-mc_res = evaluate_grid_averaged_estimator(tau_max = 0.25, grid_points = 10, n=500, R=500)
-
-
-####2#####
-# Uniform Performance vs #Grid Points
-
-## Bias Variance Trade of in number of grid points
-grid_number_evaluation <- function(
-    tau_max = 0.25,
-    grid_points_vec = c(3, 5, 10, 25, 50, 100),
-    n = 250,
-    R = 200,
-    beta_true = 1
-) {
-  library(ggplot2)
-  library(tidyr)
-  
-  results <- data.frame(
-    grid_points = grid_points_vec,
-    mse = NA,
-    abs_bias = NA,
-    variance = NA
-  )
-  
-  for (i in seq_along(grid_points_vec)) {
-    gp <- grid_points_vec[i]
-    cat("Running for grid_points =", gp, "...\n")
-    
-    res <- evaluate_grid_averaged_estimator(
-      tau_max = tau_max,
-      grid_points = gp,
-      n = n,
-      R = R,
-      beta_true = beta_true
-    )
-    
-    results$mse[i] <- res$mse
-    results$abs_bias[i] <- abs(res$bias)
-    results$variance[i] <- res$variance
-  }
-  
-  # Reshape for plotting
-  results_long <- pivot_longer(results, cols = c("mse", "abs_bias", "variance"),
-                               names_to = "metric", values_to = "value")
-  
-  # Plot
-  plot <- ggplot(results_long, aes(x = grid_points, y = value, color = metric)) +
-    geom_line() +
-    geom_point() +
-    labs(
-      title = paste0("Bias Variance Trade off from MC Sim"),
-      x = "Number of Grid Points",
-      y = "Value",
-      color = "Metric"
-    ) +
-    theme_minimal()
-  
-  return(list(results_table = results, plot = plot))
-}
-
-#Example Use 
-#NOTE: Here is no Bias Variance Trade off because each individual grid estimator in unbiased for target paramter
-# Also: for extreme tails in small samples QR are known to be biased -> Bias increases in grid size
-res_plot_obj <- grid_number_evaluation(tau_max = 0.25, n = 500, R= 5000,grid_points_vec = c(3,5,10,25,50))
-res_plot_obj$plot  # to display the ggplot
-res_plot_obj$results_table  # to inspect the raw numbers
 
