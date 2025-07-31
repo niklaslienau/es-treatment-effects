@@ -6,17 +6,11 @@ library(ggplot2)
 library(quantreg)
 library(quadprog)
 library(esreg)
-
-
-# gamma = heteroskedasticity coefficient
-# pi = Reduced form coefficent
-# rho = Error correlation that induces endogeneity
-#cont = D is continous (default) as opposed to multivalued discrete
-#error_var = variance of second normal error 
-
-simulate_dgp <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7, cont = TRUE,  error_var= 1) {
+library(dplyr)
+#----------
+simulate_dgp_lin <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7, cont = TRUE,  error_var= 1) {
   # Simulate instrument
-  Z <- rnorm(n)
+  Z <- runif(n, min=0, max=2)
   
   # Simulate correlated errors (u, e)
   Sigma <- matrix(c(1, rho, rho, 1), nrow = 2)
@@ -48,10 +42,7 @@ simulate_dgp <- function(n = 1000, beta = 1, gamma = 0.5, pi = 1, rho = 0.7, con
     
   return(data.frame(Y = Y, D = D, Z = Z, u = u, e = e, v=v, epsilon=epsilon ))
 }
-
-
-##### EASY Option #####
-
+##### no hetero  Option #####
 sim_dgp_homo = function(n= 1000, beta =1 , pi=1, rho=0.5){
   
   # Simulate correlated errors (u, e)
@@ -71,3 +62,57 @@ sim_dgp_homo = function(n= 1000, beta =1 , pi=1, rho=0.5){
   return(data.frame(Y = Y, D = D, Z = Z, u = u, e = e ))
   
 }
+
+#-----------
+
+
+#### random coefficient model #######
+
+#sim data
+simulate_dgp = function(n=1000, pi=1, rho=0.5){
+  ## DGP
+  # Simulate correlated errors (u, e)
+  Sigma <- matrix(c(1, rho, rho, 1), nrow = 2)
+  errors <- MASS::mvrnorm(n = n, mu = c(0, 0), Sigma = Sigma)
+  u <- errors[, 1]
+  e <- errors[, 2]
+  
+  #random coefficent
+  v = rnorm(n, 0, 1)
+  
+  #Simulate Z from a normal dist
+  Z= rnorm(n, 0,1)
+  
+  #Generate D
+  D = 1 + pi*Z + e
+  #Generate Y with random coefficent beta(v) = v
+  Y= v*D + u
+  
+  data=data.frame(Y = Y, D = D, Z = Z, u = u, e = e )
+  
+  return(data)
+  
+  ## True Quantile Effects
+  
+}
+#calc true qte (analytical closed form not available)
+compute_qte_tau <- function(tau, pi = 1, n = 100000) {
+  # Draw D ~ N(0, pi^2 + 1)
+  D <- rnorm(n, mean = 1, sd = sqrt(pi^2 + 1))
+  
+  # Compute QTE(tau, d) pointwise
+  QTE_d <- D / sqrt(D^2 + 1)
+  
+  # Multiply by Phi^-1(tau) to get QTE(tau)
+  qte_tau <- qnorm(tau) * mean(QTE_d)
+  
+  return(qte_tau)
+}
+
+
+#Plot true QTES
+taus <- seq(0.01, 0.99, by = 0.01)
+qtes <- sapply(taus, compute_qte_tau)
+plot(taus, qtes, type = "l", main = "True QTE(τ)", xlab = "τ", ylab = "QTE(τ)")
+
+
