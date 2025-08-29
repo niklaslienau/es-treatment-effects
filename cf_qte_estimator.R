@@ -1,8 +1,8 @@
 ###### Control function quantile regression with series expansion for residuals
 cf_qr_estimate <- function(Y, D, Z, tau = 0.5, degree = 3, return_model = FALSE) {
   
-  # Step 1: First stage - quantile regression of D on Z
-  first_stage <- rq(D ~ Z, tau = tau)
+  # Step 1: First stage - median regression of D on Z 
+  first_stage <- rq(D ~ Z, tau = 0.5)
   e_hat <- resid(first_stage)
   
   # Step 2: Build polynomial series of residuals
@@ -24,5 +24,4 @@ cf_qr_estimate <- function(Y, D, Z, tau = 0.5, degree = 3, return_model = FALSE)
     return(second_stage$coefficients["D"])
   }
 }
-
 
