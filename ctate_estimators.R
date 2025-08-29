@@ -3,6 +3,7 @@
 
 ##### CTATE ESTIMATORS ######
 
+##### 1- Asymptotically Efficient Weights #########
 # standard nonparametric bootstrap for covariance matrix
 bootstrap_qte_variances <- function(Y, D, Z,  B = 200, qte_est, grid ) {
   n <- length(Y)
@@ -17,7 +18,7 @@ bootstrap_qte_variances <- function(Y, D, Z,  B = 200, qte_est, grid ) {
     
     for (j in seq_along(tau_grid)) {
       tau <- tau_grid[j]
-      model <- try(cf_qr_estimate(Yb, Db, Zb, tau = tau), silent = TRUE)
+      model <- try(cf_qr_series_avg(Yb, Db, Zb, tau = tau, degree = 3), silent = TRUE)
       
       if (!inherits(model, "try-error") && is.numeric(model) && !is.na(model)) {
         qte_matrix[b, j] <- model
@@ -51,9 +52,8 @@ bootstrap_qte_variances <- function(Y, D, Z,  B = 200, qte_est, grid ) {
   ))
 }
 
-
 #Efficient weighting estimator with boostraped cov matrix
-efficient_es_est <- function(Y, D, Z, tau_max = 0.25, grid_points = 10, B = 200, c = 1e-2) {
+efficient_es_est <- function(Y, D, Z, tau_max = 0.25, grid_points = 8, B = 200, c = 1e-2, degree=3) {
  
   # Step 0 : Set Up Tau Grid
   n <- length(Y)
@@ -66,7 +66,7 @@ efficient_es_est <- function(Y, D, Z, tau_max = 0.25, grid_points = 10, B = 200,
   qte_estimates <- numeric(J)
   for (g in seq_along(tau_grid)) {
     tau <- tau_grid[g]
-    model <- try(cf_qr_estimate(Y, D, Z, tau = tau), silent = TRUE)
+    model <- try(cf_qr_series_avg(Y, D, Z, tau = tau, degree = degree), silent = TRUE)
     qte_estimates[g] <- if (!inherits(model, "try-error") && is.numeric(model) && !is.na(model)) model else NA
   }
   
@@ -77,6 +77,9 @@ efficient_es_est <- function(Y, D, Z, tau_max = 0.25, grid_points = 10, B = 200,
   
   
   # Step 3: Remove invalid entries (NA)
+  if (anyNA(qte_estimates)) {
+    message("Found some NA values in estimated qte vector ")
+  } # print message
   valid <- which(!is.na(qte_estimates))
   qte_estimates <- qte_estimates[valid]
   tau_grid <- tau_grid[valid]
@@ -113,12 +116,10 @@ efficient_es_est <- function(Y, D, Z, tau_max = 0.25, grid_points = 10, B = 200,
 }
 
 
+##### 2- Deterministic Weights #########
 
 
-
-##### Status Quo Estimators ####
-
-#1. Two Step
+##### 3- Status Quo Two Step Estimator  #########
 
 two_step_es_est <- function(Y, D, tau) {
   # First Step
@@ -138,4 +139,5 @@ two_step_es_est <- function(Y, D, tau) {
   
   return(es_estimate)
 }
+
 
