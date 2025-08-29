@@ -1,165 +1,103 @@
-
-## Monte Carlo Simulations for weighted estimator
-
-### MC Performance comparison CTATE vs Status Quo ES estimators
-
-plot_mc_distribution_es_estimators <- function(tau = 0.5, R = 100, n = 1000, seed = 123, beta_true=1) {
-  set.seed(seed)
-  
-  naive_joint_estimates <- numeric(R)   
-  naive_twostep_estimates <- numeric(R)   
-  lienau_estimates <- numeric(R)      
-  for (r in 1:R) {   
-    cat("Iteration", r, "of", R)
-    df <- sim_dgp_homo(n = n)          
-   
-     # Joint ES     
-    naive_joint_fit <- esreg(df$Y ~  df$D, alpha=0.25)     
-    naive_joint_estimates[r] <- naive_joint_fit$coefficients[4]          
-    
-    # Two Step ES    
-    naive_twostep_estimates[r] <- two_step_es_est(df$Y, df$D,0.25)     
-    
-    # Lienau Estimator     
-    lienau_fit = efficient_es_est(df$Y, df$D, df$Z, tau = tau)    
-    lienau_estimates[r] <- lienau_fit$estimate   }      
-  
-    # True QTE   
-    es_true <- beta_true      
-    # Combine estimates  
-    df_plot <- data.frame(
-      estimate = c(naive_joint_estimates, naive_twostep_estimates,lienau_estimates),     
-      method = factor(rep(c("Naive Joint ES","Naive Two Step ES" , "Lienau ES"), each = R))   )     
-    df_plot <- df_plot[!is.na(df_plot$estimate), ]    
-    
-    # Plot   
-    ggplot(df_plot, aes(x = estimate, fill = method)) +
-      geom_density(alpha = 0.5) +
-      geom_vline(aes(xintercept = es_true, linetype = "True CTATE"), color = "black", linewidth = 1) +
-      scale_linetype_manual(name = "", values = c("True CTATE" = "dashed")) +
-      labs(
-        title = paste0("MC Distribution of CTATE Estimators (τ = ", tau, ")"),
-        x = "Estimate", y = "Density", fill = "Estimator"
-      ) +
-      theme_minimal()    
-    }
+### Simulations on the asymptotically efficient weighting estimator ###
 
 
-quartz()
-plot_mc_distribution_es_estimators(tau = 0.25, R = 200, n=500, seed=123)
-
-
-
-
-
-
-
-
-
-
-
-############################################### (1) EFFICIENT WEIGHTING ################################
 
 
 # Performance as a function of regularization parameter c
 # Function to run a full Monte Carlo simulation of the efficient ES estimator for different values of c
 #Visualize bias variance tradeof
 monte_carlo_weighted_es <- function(
-    c_values,
-    R = 1000,
-    n = 500,
-    tau_max = 0.25,
-    grid_points = 10,
-    B = 200,
-    beta_true = 1
-) {
+    c_values, R = 1000, n = 500, tau_max = 0.25, grid_points = 10, B = 200
+){
   start_time <- Sys.time()
   results_list <- list()
   
   for (r in 1:R) {
     cat("Monte Carlo iteration", r, "of", R, "\n")
     
-    # Step 1: Simulate data
-    df <- simulate_dgp(n = n, scale = FALSE)
+    # 1) simulate
+    df <- simulate_dgp_rand(n = n)
     
-    # Step 2: Estimate QTEs across tau grid
+    # 2) fixed tau-grid for this rep
     tau_grid <- seq(0, tau_max, length.out = grid_points)
     tau_grid <- tau_grid[tau_grid > 0 & tau_grid < 1]
     G <- length(tau_grid)
-    qte_estimates <- numeric(G)
     
+    # QTE estimates 
+    qte_estimates <- rep(NA_real_, G)
     for (g in seq_along(tau_grid)) {
       tau <- tau_grid[g]
-      model <- try(cf_qr_estimate(df$Y, df$D, df$Z, tau = tau), silent = TRUE)
-      qte_estimates[g] <- if (!inherits(model, "try-error") && is.numeric(model) && !is.na(model)) model else NA
+      est <- try(cf_qr_series_avg(df$Y, df$D, df$Z, tau = tau), silent = TRUE)
+      if (!inherits(est, "try-error") && is.finite(est)) qte_estimates[g] <- est
     }
     
-    valid <- which(!is.na(qte_estimates))
-    if (length(valid) < 2) next
+    valid <- which(is.finite(qte_estimates))
+    if (length(valid) < 2L) next
     
     qte_estimates <- qte_estimates[valid]
     tau_grid <- tau_grid[valid]
     G <- length(valid)
+    u <- rep(1/G, G)
     
-    # Step 3: Bootstrap variance-covariance matrix
-    boot <- bootstrap_qte_variances(Y = df$Y, D = df$D, Z = df$Z, tau_max = tau_max, grid_points = grid_points, B = B)
-    cov_matrix <- boot$cov_matrix[valid, valid, drop = FALSE]
-    u <- rep(1 / G, G)
+    # 3) bootstrap covariance
+    boot <- try(bootstrap_qte_variances(Y = df$Y, D = df$D, Z = df$Z,
+                                        B = B, qte_est = qte_estimates, grid = tau_grid),
+                silent = TRUE)
+    if (inherits(boot, "try-error")) next
+    cov_matrix <- boot$cov_estimate
     
-    # Step 4: Calculate weights and compute ES estimates for each c
-    estimates <- numeric(length(c_values))
+    # 4) ES for each c (correct Dmat/dvec)
+    estimates <- rep(NA_real_, length(c_values))
     for (i in seq_along(c_values)) {
       c_val <- c_values[i]
-      Dmat <- cov_matrix + c_val * diag(G)
-      dvec <- c_val * u
+      A <- cov_matrix + c_val * diag(G)
+      Dmat <- 2 * A
+      dvec <- 2 * c_val * u
       Amat <- matrix(1, nrow = G, ncol = 1)
       bvec <- 1
-      
       sol <- try(solve.QP(Dmat, dvec, Amat, bvec, meq = 1), silent = TRUE)
       if (!inherits(sol, "try-error")) {
-        weights <- sol$solution
-        estimates[i] <- sum(weights * qte_estimates)
-      } else {
-        estimates[i] <- NA
+        w <- sol$solution
+        estimates[i] <- sum(w * qte_estimates)
       }
     }
     
-    results_list[[r]] <- estimates
+    if (any(is.finite(estimates))) results_list[[length(results_list)+1L]] <- estimates
   }
   
-  # Combine into matrix
+  if (!length(results_list))
+    stop("No successful MC replications — check that QTE and bootstrap succeed for your DGP.")
+  
   result_matrix <- do.call(rbind, results_list)
+  if (is.null(dim(result_matrix))) result_matrix <- matrix(result_matrix, nrow = 1)
   colnames(result_matrix) <- paste0("c_", c_values)
   
-  # Compute summary statistics
+  theta_true <- compute_ctate_tau(tau_max)  # true ES at tau_max
+  
   summary_stats <- data.frame(
     c = c_values,
-    mse = apply(result_matrix, 2, function(x) mean((x - beta_true)^2, na.rm = TRUE)),
+    mse = apply(result_matrix, 2, function(x) mean((x - theta_true)^2, na.rm = TRUE)),
     variance = apply(result_matrix, 2, var, na.rm = TRUE),
-    bias = apply(result_matrix, 2, function(x) mean(x - beta_true, na.rm = TRUE)),
-    abs_bias = apply(result_matrix, 2, function(x) mean(abs(x - beta_true), na.rm = TRUE)),
-    squared_bias = apply(result_matrix, 2, function(x) mean(x - beta_true, na.rm = TRUE)^2)
+    bias = apply(result_matrix, 2, function(x) mean(x - theta_true, na.rm = TRUE)),
+    abs_bias = apply(result_matrix, 2, function(x) mean(abs(x - theta_true), na.rm = TRUE)),
+    squared_bias = apply(result_matrix, 2, function(x) mean(x - theta_true, na.rm = TRUE)^2)
   )
   
   total_time <- Sys.time() - start_time
   cat("Total computation time:", total_time, "\n")
   
-  return(list(
-    estimates = result_matrix,
-    summary = summary_stats,
-    runtime = total_time
-  ))
+  list(estimates = result_matrix, summary = summary_stats, runtime = total_time)
 }
 
 # Run it
-c_values <- c(1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,1e0,1e1,1e2,1e3,1e4 )
-mc_plots <- monte_carlo_weighted_es(c= c_values, R = 1000, n = 500, tau_max =0.5)
+c_values <- c(1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,1e0,1e1,1e2)
+mc_plots <- monte_carlo_weighted_es(c= c_values, R = 500, n = 5000, tau_max =0.5, grid_points = 15)
 
 
 # Plot
 ggplot(mc_plots$summary, aes(x = log10(c))) +
-  geom_line(aes(y = mse, color = "MSE"), size = 1.2) +
-  geom_point(aes(y = mse, color = "MSE")) +
+  geom_line(aes(y = variance, color = "variance"), size = 1.2) +
+  geom_point(aes(y = variance, color = "variance")) +
   labs(
     x = expression(log[10](c)),
     y = "Value",
