@@ -1,3 +1,5 @@
+# This file explores potential problem with the Location Scale DGP
+
 ### ANALYZE ENDOGENIETY; HETEROSKEDASTICITY AND EXLCUSION RESTRICTION
 
 
@@ -5,8 +7,8 @@
 
 #### ENDGENIETY ######
 # Assuming simulate_dgp() returns a data frame with D and v
-df_ne <- sim_dgp_homo(rho=0)
-df_e  <- sim_dgp_homo(rho=0.5)
+df_ne <- simulate_dgp(rho=0)
+df_e  <- simulate_dgp(rho=0.5)
 
 # Add labels to each dataset
 df_ne$type <- "No Endogeneity (ρ = 0)"
@@ -40,8 +42,8 @@ library(ggplot2)
 library(dplyr)
 
 # Simulate data
-df_ne <- sim_dgp_homo(rho=0)
-df_e  <- sim_dgp_homo(rho=0.5)
+df_ne <- simulate_dgp(rho=0)
+df_e  <- simulate_dgp(rho=0.5)
 
 # Label each
 df_ne$type <- "No Endogeneity (ρ = 0)"
@@ -54,10 +56,10 @@ df_all <- bind_rows(df_ne, df_e)
 cov_labels <- df_all %>%
   group_by(type) %>%
   summarise(
-    cov_zu = cov(Z, u),
+    cov_zv = cov(Z, u),
     xpos = min(Z) + 0.1 * (max(Z) - min(Z)),
     ypos = max(u) - 0.1 * (max(u) - min(u)),
-    label = paste0("Cov(Z, v) = ", round(cov_zu, 3))
+    label = paste0("Cov(Z, v) = ", round(cov_zv, 3))
   )
 
 # Plot
@@ -86,7 +88,11 @@ ggplot(df_all, aes(x = Z, y = u)) +
 
 
 
-######### linear Heteroskedasticity kills Endogeniety because D is dist symetrically around 0 ############
+#### ONLY FOR LOCATION SCALE ###############
+
+######### linear Heteroskedasticity with NORMAL ERROR  kills Endogeniety because D is dist symetrically around 0 ############
+# -> Go uniform 
+
 #why sigma needs abs(D) not D
 #df= simulate_dgp()
 df = simulate_dgp(error_var = 0.2)
