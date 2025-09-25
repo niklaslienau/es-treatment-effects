@@ -41,7 +41,7 @@ simulate_dgp_rand = function(n=1000, pi=1, rho=0.5){
 }
 
 #compute true qte 
-compute_qte_tau_<- function(tau, pi = 1) {
+compute_qte_tau <- function(tau, pi = 1) {
   g <- function(d) (d / sqrt(d^2 + 1)) * dnorm(d, mean = 1, sd = sqrt(pi^2 + 1))
   ex <- integrate(g, lower = -Inf, upper = Inf, rel.tol = 1e-9)$value
   
